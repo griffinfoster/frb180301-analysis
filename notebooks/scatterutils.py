@@ -3,6 +3,7 @@ Utility functions for scatter fitting routines
 """
 
 import numpy as np
+from scipy import stats
 import matplotlib.pyplot as plt
 from lmfit import Model, conf_interval, printfuncs
 from lmfit.models import GaussianModel, PowerLawModel 
@@ -499,7 +500,12 @@ def produce_taufits(filepath,meth='iso'):
         ncols = 2
         if nch%2==1: nrows = (nch / ncols) + 1
         else: nrows = nch / ncols
-        figg = plt.figure(figsize=(10,8))
+            
+        figg = plt.figure(figsize=(14,7))
+        if nch==1:
+            ncols = 1
+            figg = plt.figure(figsize=(14,5))
+            
         plt.rc('font', family='serif')
         for k in range(nch):             
             plt.subplot(nrows,ncols,k+1)
@@ -507,22 +513,58 @@ def produce_taufits(filepath,meth='iso'):
             plt.plot(profilexaxis,model_highsnr[k],prof,lw = 2.0, alpha
                         = 0.7,label=r'$\tau: %.2f \pm %.2f$ %s'
                         %(taulabel[k], taulabelerr[k], taustring))
-            plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[k]))
+            plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[k]), fontsize=14)
             plt.ylim(ymax=1.3*np.max(data_highsnr[k]))
             plt.xlim(xmax=pulseperiod)
-            plt.xticks(fontsize=11)
-            plt.yticks(fontsize=11)
-            plt.xlabel('time (s)',fontsize=11)
-            plt.legend(fontsize=11,numpoints=1)
-            plt.ylabel('normalized intensity',fontsize=11)
-        figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.35,hspace=0.35,bottom=0.15)
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
+            plt.xlabel('time (s)',fontsize=12)
+            plt.legend(fontsize=12,numpoints=1)
+            plt.ylabel('normalized \nintensity',fontsize=12)
+            plt.tight_layout()
+        figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.25,hspace=0.5,bottom=0.1)
         plt.show()
-
+        
         for i in range(nch):
             print'Tau (ms): %.2f' %(1000*taussec_highsnr[i])
             tau1GHz = tauatfreq(freqMHz_highsnr[i]/1000.,taussec_highsnr[i],1.0,4)
             print 'tau1GHz_alpha_4 (ms) ~ %.2f \n' %(tau1GHz*1000)
-            
+
+        
+        # """Compute the KS Test D value and probability of the residuals following a normal distribution"""
+        KSs = np.zeros((nch,2))
+        ADs = np.zeros((nch,2))
+        figg2 = plt.figure(figsize=(14,7))
+        if nch==1:
+            ncols = 1
+            figg2 = plt.figure(figsize=(14,5))
+        for i in range(nch):
+            resdata = data_highsnr[i] - model_highsnr[i]
+            resnormed = (resdata-resdata.mean())/resdata.std()
+            KSd, KSp = stats.kstest(resnormed, 'norm')
+            KSs[i,0] = KSd
+            KSs[i,1]= KSp
+                     
+            plt.subplot(nrows,ncols,i+1)
+            plt.title('KS value: %.2f' %KSp, fontsize=14)
+            plt.hist(data_highsnr[i] - model_highsnr[i],alpha=0.5,bins=20)
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
+            plt.xlabel('residual time (s)',fontsize=12)
+            plt.ylabel('counts',fontsize=12)
+        figg2.subplots_adjust(left = 0.08, right = 0.98, wspace=0.25,hspace=0.65,bottom=0.1)
+        plt.show()
+
+            #print KSd, KSp
+
+        #    aa,bb,cc = stats.anderson(resnormed, 'norm')
+        #    print aa,bb,cc
+
+        resmeanP = np.mean(KSs[:,1])
+        print "Mean probability of residuals being Gaussian: %.4f" % resmeanP
+        
+      
+             
         return freqMHz_highsnr, taussec_highsnr, lmfitstdssec_highsnr 
 
 
